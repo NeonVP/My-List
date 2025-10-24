@@ -1,0 +1,4 @@
+*.json
+/.cache
+list
+list-debug
