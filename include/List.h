@@ -9,12 +9,27 @@
 #include "DebugUtils.h"
 
 
-#define INIT( name ) ON_DEBUG( .var_info={ 0, #name, __func__, __FILE__, __LINE__ } )
+#define INIT( name ) ON_DEBUG( .var_info={ LIST_ERR_NONE, #name, __func__, __FILE__, __LINE__ } )
 #define CHECK_STATUS( command )                                                       \
     if ( command != SUCCESS ) {                                                       \
         fprintf( stderr, COLOR_BRIGHT_RED "Incorrect command `%s` \n", #command );    \
         return EXIT_FAILURE;                                                          \
     }
+
+#ifdef _DEBUG
+#define VERIFY( ... )                                     \
+    if ( ListVerify( list ) != SUCCESS ) {                \
+        PRINT_STATUS_FAIL;                                \
+        return FAIL;                                      \
+    }                                                     \
+    __VA_ARGS__                                           \
+    if ( ListVerify( list ) != SUCCESS ) {                \
+        PRINT_STATUS_FAIL;                                \
+        return FAIL;                                      \
+    }
+#else
+#define VERIFY( list ) __VA_ARGS__
+#endif
 
 const size_t MAX_LEN_PATH = 50;
 
@@ -27,7 +42,7 @@ const size_t MAX_LEN_PATH = 50;
         size_t      line;
     };
 
-    struct LogStat_t {
+    struct LogStat {
         char log_directory [ MAX_LEN_PATH ];
         char log_file_path [ MAX_LEN_PATH + 12 ];     
         /* 
@@ -41,10 +56,10 @@ const size_t MAX_LEN_PATH = 50;
     };
 
     enum ListErrorCodes {
-        LIST_ERROR_NONE               = 1 << 0,
-        LIST_ERROR_SIZE_OVER_CAPACITY = 1 << 1,
-        LIST_ERROR_ISNT_POISON        = 1 << 2,
-        LIST_ERROR_NULL_CAPACITY      = 1 << 3
+        LIST_ERR_NONE                   = 1 << 0,
+        LIST_ERR_SIZE_OVER_CAPACITY     = 1 << 1,
+        LIST_ERR_MISSING_NODE_DATA      = 1 << 2,
+        LIST_ERR_NULL_CAPACITY          = 1 << 3,
     };
 
     enum LogModes {
@@ -74,35 +89,38 @@ struct Element_t {
     int           next;
 };
 
-struct List_t {
-    int head;
-    int tail;
-    int free;
-    
+struct List_t {    
     int size;
     int capacity;
+    
+    int free;
 
     Element_t* elements;
 
-    #ifdef _DEBUG
+    #ifdef _DEBUGlist->elements[0].next );
+    PRINT_IN_GRAPHIC( "tail -> node%d [arrowhead=vee];\n\t", list->elements[0].prev );
+    PRINT_IN_GRAPHIC( "free -> node%d [arrowhead=vee];\n\t", list->free );
         VarInfo_t var_info;
-        LogStat_t logging;
+        LogStat logging;
     #endif
 };
 
 
 ListStatus_t ListCtor( List_t* list, const int data_capacity );
 ListStatus_t ListDtor( List_t* lsit );
+void ListRealloc( List_t* list, const int new_capacity );
 
 ListStatus_t ListInsert( List_t* list, const int index, const ElementData_t number  );
 ListStatus_t ListDelete( List_t* list, const int index );
 
-void ListVerify( List_t* list );
+#ifdef _DEBUG
+    ListStatus_t ListVerify( List_t* list );
 
-void ListLog( List_t* list, LogModes mode );
-void FileAndFolderCreate( List_t* list);
-void ListDump( const List_t* list );
-void GraphicPrintoutDraw( List_t* list );
+    void ListLog            ( List_t* list, LogModes mode, const char* service_message );
+    void FileAndFolderCreate( List_t* list );
+    void ListDump           ( const List_t* list, const char* service_message );
+    void GraphicPrintoutDraw( List_t* list );
+#endif
 
 
 #endif // LIST_H
