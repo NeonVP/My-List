@@ -18,21 +18,6 @@
 
 const size_t MAX_LEN_PATH = 50;
 
-enum ListStatus_t {
-    SUCCESS = 0,
-    FAIL    = 1
-};
-
-typedef double ElementData_t;
-
-const ElementData_t poison = 777;
-
-struct Element_t {
-    int           prev;
-    ElementData_t value;
-    int           next;
-};
-
 #ifdef _DEBUG
     struct VarInfo_t {
         long        error_code;
@@ -43,12 +28,13 @@ struct Element_t {
     };
 
     struct LogStat_t {
-        char log_file_folder [ MAX_LEN_PATH ];
-        char log_file_address[ MAX_LEN_PATH + 12 ];     
+        char log_directory [ MAX_LEN_PATH ];
+        char log_file_path [ MAX_LEN_PATH + 12 ];     
         /* 
         The buffer needs extra 12 bytes to safely store the appended "/LOGFILE.htm" string. 
         This prevents truncation when combining the folder path with the fixed filename. 
         */
+
         FILE* log_file;
 
         size_t image_number;
@@ -68,20 +54,35 @@ struct Element_t {
     };
 
     enum FillColors {
-        COLOR_FREE = 0xEAB56F,
-        COLOR_OCCUPIED = 0xE37239
+        COLOR_FREE     = 0xE6F3FF,
+        COLOR_OCCUPIED = 0xB3D9FF
     };
 #endif
+
+enum ListStatus_t {
+    SUCCESS = 0,
+    FAIL    = 1
+};
+
+typedef double ElementData_t;
+
+const ElementData_t poison = 777;
+
+struct Element_t {
+    int           prev;
+    ElementData_t value;
+    int           next;
+};
 
 struct List_t {
     int head;
     int tail;
     int free;
-
-    Element_t* data;
     
     int size;
     int capacity;
+
+    Element_t* elements;
 
     #ifdef _DEBUG
         VarInfo_t var_info;

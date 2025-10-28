@@ -2,10 +2,12 @@
 
 int main() {
     List_t list = { INIT( list ) };
-    CHECK_STATUS( ListCtor( &list, 10 ) );
     ON_DEBUG( ListLog( &list, BEGIN_OF_PROGRAMM ); )
 
-    CHECK_STATUS( ListInsert( &list, 1, 10 ) );
+    CHECK_STATUS( ListCtor( &list, 10 ) );
+    ListLog( &list, DUMP );
+
+    CHECK_STATUS( ListInsert( &list, 0, 10 ) );
     ListLog( &list, DUMP );
     CHECK_STATUS( ListInsert( &list, 1, 20 ) );
     ListLog( &list, DUMP );
@@ -19,8 +21,10 @@ int main() {
     ListLog( &list, DUMP );
     CHECK_STATUS( ListInsert( &list, 3, 35 ) );
     ListLog( &list, DUMP );
-
-    ON_DEBUG( ListLog( &list, END_OF_PROGRAM ); )
+    ListDelete( &list, 6 );
+    ListLog( &list, DUMP );
 
     ListDtor( &list );
+
+    ON_DEBUG( ListLog( &list, END_OF_PROGRAM ); )
 }
