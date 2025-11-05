@@ -6,14 +6,16 @@ int main() {
 
     CHECK_STATUS( ListCtor( &list, 10 ) );
 
-    CHECK_STATUS( ListInsert( &list, 0, 10 ) );
-    CHECK_STATUS( ListInsert( &list, 1, 20 ) );
-    CHECK_STATUS( ListInsert( &list, 2, 30 ) );
-    CHECK_STATUS( ListInsert( &list, 3, 40 ) );
-    CHECK_STATUS( ListInsert( &list, 4, 50 ) );
-    CHECK_STATUS( ListInsert( &list, 5, 60 ) );
-    CHECK_STATUS( ListInsert( &list, 3, 35 ) );
+    CHECK_STATUS( ListInsertAfter( &list, 0, 10 ) );
+    CHECK_STATUS( ListInsertAfter( &list, 1, 20 ) );
+    CHECK_STATUS( ListInsertAfter( &list, 2, 30 ) );
+    CHECK_STATUS( ListInsertAfter( &list, 3, 40 ) );
+    CHECK_STATUS( ListInsertAfter( &list, 4, 50 ) );
+    CHECK_STATUS( ListInsertAfter( &list, 5, 60 ) );
+    CHECK_STATUS( ListInsertAfter( &list, 3, 35 ) );
     CHECK_STATUS( ListDelete( &list, 6 ) );
+    list.elements[5].next = 1;
+    CHECK_STATUS( ListInsertAfter( &list, 6, 35 ) );
 
     ListDtor( &list );
 

@@ -1,7 +1,12 @@
-#include <cstdlib>
-#include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
+
+#ifdef _LINUX
+#include <linux/limits.h>
+const size_t MAX_LEN_PATH = PATH_MAX;
+#else
+const size_t MAX_LEN_PATH = 128;
+#endif
 
 #ifndef LIST_H
 #define LIST_H
@@ -13,6 +18,7 @@
 #define CHECK_STATUS( command )                                                       \
     if ( command != SUCCESS ) {                                                       \
         fprintf( stderr, COLOR_BRIGHT_RED "Incorrect command `%s` \n", #command );    \
+        ListDtor( &list );                                                             \
         return EXIT_FAILURE;                                                          \
     }
 
@@ -31,11 +37,9 @@
 #define VERIFY( list ) __VA_ARGS__
 #endif
 
-const size_t MAX_LEN_PATH = 50;
-
 #ifdef _DEBUG
     struct VarInfo_t {
-        long        error_code;
+        uint        error_code;
         const char* name;
         const char* func;
         const char* file;
@@ -43,12 +47,10 @@ const size_t MAX_LEN_PATH = 50;
     };
 
     struct LogStat {
-        char log_directory [ MAX_LEN_PATH ];
-        char log_file_path [ MAX_LEN_PATH + 12 ];     
-        /* 
-        The buffer needs extra 12 bytes to safely store the appended "/LOGFILE.htm" string. 
-        This prevents truncation when combining the folder path with the fixed filename. 
-        */
+        char* common_log_directory;
+        char* log_file_path;
+        char* log_img_directory;
+        char* log_img_src_directory;
 
         FILE* log_file;
 
@@ -56,10 +58,13 @@ const size_t MAX_LEN_PATH = 50;
     };
 
     enum ListErrorCodes {
-        LIST_ERR_NONE                   = 1 << 0,
-        LIST_ERR_SIZE_OVER_CAPACITY     = 1 << 1,
-        LIST_ERR_MISSING_NODE_DATA      = 1 << 2,
-        LIST_ERR_NULL_CAPACITY          = 1 << 3,
+        LIST_ERR_NONE                     = 0,
+        LIST_ERR_SIZE_CAPACITY_CORRUPTION = 1 << 0,
+        LIST_ERR_POISON_CORRUPTION        = 1 << 1,
+        LIST_ERR_STRAIGHT_LOOP            = 1 << 2,
+        LIST_ERR_REVERSE_LOOP             = 1 << 3,
+        LIST_ERR_FREE_LOOP                = 1 << 4,
+        LIST_ERR_LACK_OF_ELEMENTS         = 1 << 5
     };
 
     enum LogModes {
@@ -81,6 +86,10 @@ enum ListStatus_t {
 
 typedef double ElementData_t;
 
+// TODO: hide struct fields from users: transfer struct fo .cpp and add typedef
+// struct list;
+// typedef list List_t;
+
 const ElementData_t poison = 777;
 
 struct Element_t {
@@ -97,9 +106,7 @@ struct List_t {
 
     Element_t* elements;
 
-    #ifdef _DEBUGlist->elements[0].next );
-    PRINT_IN_GRAPHIC( "tail -> node%d [arrowhead=vee];\n\t", list->elements[0].prev );
-    PRINT_IN_GRAPHIC( "free -> node%d [arrowhead=vee];\n\t", list->free );
+    #ifdef _DEBUG
         VarInfo_t var_info;
         LogStat logging;
     #endif
@@ -108,19 +115,41 @@ struct List_t {
 
 ListStatus_t ListCtor( List_t* list, const int data_capacity );
 ListStatus_t ListDtor( List_t* lsit );
+
 void ListRealloc( List_t* list, const int new_capacity );
 
-ListStatus_t ListInsert( List_t* list, const int index, const ElementData_t number  );
-ListStatus_t ListDelete( List_t* list, const int index );
+ListStatus_t ListInsertAfter ( List_t* list, const int index, const ElementData_t number  );
+ListStatus_t ListInsertBefore( List_t* list, const int index, const ElementData_t number );
+ListStatus_t ListDelete      ( List_t* list, const int index );
+
+int ListGetHead( List_t* list );
+int ListGetTail( List_t* list );
+
+int ListGetHead    ( const List_t* list );
+int ListGetTail    ( const List_t* list );
+int ListGetFree    ( const List_t* list );
+int ListGetSize    ( const List_t* list );
+int ListGetCapacity( const List_t* list );
+
+int           ListGetNext   ( const List_t* list, const int index );
+int           ListGetPrev   ( const List_t* list, const int index );
+ElementData_t ListGetElement( const List_t* list, const int index );
 
 #ifdef _DEBUG
     ListStatus_t ListVerify( List_t* list );
 
-    void ListLog            ( List_t* list, LogModes mode, const char* service_message );
-    void FileAndFolderCreate( List_t* list );
-    void ListDump           ( const List_t* list, const char* service_message );
+    LogStat* ListGetLogging( const List_t* list );
+
+    void ListLog( List_t* list, LogModes mode, const char* service_message, ... );
+
+    void FolderCreate( List_t* list );
+
+    void ListDump      ( const List_t* list, const char* service_message, va_list args );
+    void ListPrintStats( const List_t* list );
+
     void GraphicPrintoutDraw( List_t* list );
 #endif
 
+// за size  проверять, что мы возвращаемся к нулевому элементу
 
 #endif // LIST_H
