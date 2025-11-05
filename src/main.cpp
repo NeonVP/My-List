@@ -15,6 +15,8 @@ int main() {
     CHECK_STATUS( ListInsertAfter( &list, 3, 35 ) );
     CHECK_STATUS( ListDelete( &list, 6 ) );
     list.elements[5].next = 1;
+    list.elements[9].next = 8;
+    list.elements[1].prev = 5;
     CHECK_STATUS( ListInsertAfter( &list, 6, 35 ) );
 
     ListDtor( &list );

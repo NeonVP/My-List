@@ -12,54 +12,12 @@
 #include "DebugUtils.h"
 #include "List.h"
 
-
-ON_DEBUG( enum ConnectionType { NEXT, PREV }; )
-
-
 #ifdef _DEBUG
     #define PRINT_IN_LOG( str, ... )        fprintf(  list->logging.log_file, str, ##__VA_ARGS__ );
     #define PRINT_IN_LOG_VAARG( str, args ) vfprintf( list->logging.log_file, str, args );
     #define PRINT_IN_GRAPHIC( str, ... )    fprintf(  graphic_file,           str, ##__VA_ARGS__ );
 
     #define PASS
-
-
-    void ListLog( List_t* list, const LogModes mode, const char* service_message, ... ) { 
-        my_assert( list, "Null pointer on `list`" );
-
-        switch ( mode ) {   
-            case BEGIN_OF_PROGRAMM: {
-                FolderCreate( list );
-
-                list->logging.log_file = fopen( list->logging.log_file_path, "w" );
-                assert( list->logging.log_file && "File opening error" );
-
-                fprintf( list->logging.log_file, "<pre>\n" );
-
-                break;
-            }
-            case DUMP: {
-                va_list args;
-                va_start( args, service_message );
-                ListDump( list, service_message, args );
-                va_end( args );
-                GraphicPrintoutDraw( list );
-
-                break;
-            }
-            case END_OF_PROGRAM: {
-                int close_result = fclose( list->logging.log_file );
-                assert( close_result == 0 &&"File closing error" );            
-
-                break;
-            }
-            default: {
-                fprintf( stderr, "Unkmown mode\n" );
-                
-                break;
-            }       
-        }
-    }
 
     static void CommandExecute( const char* format_string, ... ) {
         my_assert( format_string, "Null pointer of `format_string`" );
@@ -73,7 +31,7 @@ ON_DEBUG( enum ConnectionType { NEXT, PREV }; )
         system( command );
     }
 
-    void FolderCreate( List_t* list ) {
+    static void FolderCreate( List_t* list ) {
         my_assert( list, "Null pointer on `list`" );
 
         time_t current_time = time( NULL );
@@ -101,54 +59,7 @@ ON_DEBUG( enum ConnectionType { NEXT, PREV }; )
         CommandExecute( "mkdir -p %s", list->logging.log_img_src_directory );
     }
 
-    void ListDump( const List_t* list, const char* service_message, va_list args ) {
-        my_assert( list, "Null pointer to `list`" );
-
-        PRINT_IN_LOG( "<h3> DUMP " );
-        PRINT_IN_LOG_VAARG( service_message, args );
-        // PRINT_IN_LOG( "%s", service_message );
-        PRINT_IN_LOG( " </h3> \n" );
-
-        uint error_code = list->var_info.error_code;
-
-        if ( error_code != LIST_ERR_NONE ) {
-            if ( error_code & LIST_ERR_SIZE_CAPACITY_CORRUPTION ) {
-                PRINT( COLOR_BRIGHT_RED "Size/capacity corruption!!!" );
-
-                return;
-            }
-
-            const char* error_message[] = {
-                "Size/capacity corruption",
-                "Poison corruption",
-                "Straight loop",
-                "Reverse loop",
-                "Free loop",
-                "Lack of elements"
-            };
-
-            if ( error_code)
-                for ( int n = 0; n < 8; n++ ) {
-                    if ( list->var_info.error_code & ( 1 << n) ) {
-                        PRINT_IN_LOG( "%s", error_message[ n ] );
-                    }
-            }
-        }
-
-        
-        PRINT_IN_LOG( "\n\n" );
-
-        ListPrintStats( list );
-
-        PRINT_IN_LOG( 
-            "\n<img src=\"images/image%lu.png\" height=\"200px\">\n",
-            list->logging.image_number
-        );
-
-        PRINT_IN_LOG( "\n\n" );
-    }
-
-    void ListPrintStats( const List_t* list ) {
+        static void ListPrintStats( const List_t* list ) {
         my_assert( list, "Null pointer on `list`" );
 
         PRINT_IN_LOG( 
@@ -212,6 +123,57 @@ ON_DEBUG( enum ConnectionType { NEXT, PREV }; )
         }
     }
 
+
+    static void ListDump( const List_t* list, const char* service_message, va_list args ) {
+        my_assert( list, "Null pointer to `list`" );
+
+        PRINT_IN_LOG      ( "<h3> DUMP " );
+        PRINT_IN_LOG_VAARG( service_message, args );
+        PRINT_IN_LOG      ( " </h3> \n" );
+
+        uint error_code = list->var_info.error_code;
+
+        if ( error_code != LIST_ERR_NONE ) {
+            if ( error_code & LIST_ERR_SIZE_CAPACITY_CORRUPTION ) {
+                PRINT( COLOR_BRIGHT_RED "Size/capacity corruption!!!" );
+
+                return;
+            }
+
+            const char* error_message[] = {
+                "Size/capacity corruption",
+                "Poison corruption",
+                "Straight loop",
+                "Reverse loop",
+                "Free loop",
+                "Lack of elements in straight passage",
+                "Lack of elements in reverse passage",
+                "Lack of elements in passage of free elements"
+            };
+
+            for ( int n = 0; n < 8; n++ ) {
+                if ( list->var_info.error_code & ( 1 << n) ) {
+                    PRINT_IN_LOG( "<font color=\"red\">%s</font> \n", error_message[ n ] );
+                }
+            }
+        }
+        else {
+            PRINT_IN_LOG( "<font color=\"green\">No error</font>\n" );
+        }
+
+        
+        PRINT_IN_LOG( "\n\n" );
+
+        ListPrintStats( list );
+
+        PRINT_IN_LOG( 
+            "\n<img src=\"images/image%lu.png\" height=\"200px\">\n",
+            list->logging.image_number
+        );
+
+        PRINT_IN_LOG( "\n\n" );
+    }
+
     static void ProcessConnection( FILE* graphic_file, List_t* list, int source_idx ) {
         my_assert( graphic_file, "Null pointer on `graphic file" );
         my_assert( list, "Null pointer on `list`" );
@@ -266,7 +228,7 @@ ON_DEBUG( enum ConnectionType { NEXT, PREV }; )
         }        
     }
 
-    void GraphicPrintoutDraw( List_t* list ) {
+    static void GraphicPrintoutDraw( List_t* list ) {
         my_assert( list, "Null pointer on `list`" );
 
         char graphic_source_address[ MAX_LEN_PATH ] = "";
@@ -341,5 +303,43 @@ ON_DEBUG( enum ConnectionType { NEXT, PREV }; )
         );
 
         list->logging.image_number++;
+    }
+
+
+    void ListLog( List_t* list, const LogModes mode, const char* service_message, ... ) { 
+        my_assert( list, "Null pointer on `list`" );
+
+        switch ( mode ) {   
+            case BEGIN_OF_PROGRAMM: {
+                FolderCreate( list );
+
+                list->logging.log_file = fopen( list->logging.log_file_path, "w" );
+                assert( list->logging.log_file && "File opening error" );
+
+                fprintf( list->logging.log_file, "<pre>\n" );
+
+                break;
+            }
+            case DUMP: {
+                va_list args;
+                va_start( args, service_message );
+                ListDump( list, service_message, args );
+                va_end( args );
+                GraphicPrintoutDraw( list );
+
+                break;
+            }
+            case END_OF_PROGRAM: {
+                int close_result = fclose( list->logging.log_file );
+                assert( close_result == 0 &&"File closing error" );            
+
+                break;
+            }
+            default: {
+                fprintf( stderr, "Unkmown mode\n" );
+                
+                break;
+            }       
+        }
     }
 #endif

@@ -15,26 +15,43 @@ const size_t MAX_LEN_PATH = 128;
 
 
 #define INIT( name ) ON_DEBUG( .var_info={ LIST_ERR_NONE, #name, __func__, __FILE__, __LINE__ } )
-#define CHECK_STATUS( command )                                                       \
-    if ( command != SUCCESS ) {                                                       \
-        fprintf( stderr, COLOR_BRIGHT_RED "Incorrect command `%s` \n", #command );    \
-        ListDtor( &list );                                                             \
-        return EXIT_FAILURE;                                                          \
-    }
 
 #ifdef _DEBUG
-#define VERIFY( ... )                                     \
-    if ( ListVerify( list ) != SUCCESS ) {                \
-        PRINT_STATUS_FAIL;                                \
-        return FAIL;                                      \
-    }                                                     \
-    __VA_ARGS__                                           \
-    if ( ListVerify( list ) != SUCCESS ) {                \
-        PRINT_STATUS_FAIL;                                \
-        return FAIL;                                      \
+#define VERIFY( ... )                                           \
+    ListVerify( list );                                              \
+    ListLog( list, DUMP, __VA_ARGS__ );                              \
+    if ( list->var_info.error_code != LIST_ERR_NONE ) {              \
+        PRINT_STATUS_FAIL;                                           \
+        return FAIL_VERIFY;                                          \
     }
+
+#define CHECK_STATUS( command )                                                                                                                \
+    {                                                                                                                                          \
+    ListStatus_t status = command;                                                                                                             \
+    if ( status == FAIL ) {                                                                                                                    \
+        fprintf( stderr, COLOR_BRIGHT_RED "Incorrect command `%s` \n", #command );                                                             \
+        ListDtor( &list );                                                                                                                     \
+        return EXIT_FAILURE;                                                                                                                   \
+    }                                                                                                                                          \
+    else if ( status != SUCCESS ) {                                                                                                            \
+        fprintf(                                                                                                                               \
+            stderr,                                                                                                                            \
+            COLOR_BRIGHT_RED "ERROR: Verification failed while executing `%s`. See logs for details: ./%s. \n",                                  \
+            #command, list.logging.log_file_path                                                                                               \
+        );                                                                                                                                     \
+        ListDtor( &list );                                                                                                                     \
+        return EXIT_FAILURE;                                                                                                                   \
+    }                                                                                                                                          \
+    }
+
 #else
-#define VERIFY( list ) __VA_ARGS__
+#define VERIFY( str, ... ) 
+#define CHECK_STATUS( command )                                                                                                                \
+    if ( command == FAIL ) {                                                                                                                    \
+        fprintf( stderr, COLOR_BRIGHT_RED "Incorrect command `%s` \n", #command );                                                             \
+        ListDtor( &list );                                                                                                                     \
+        return EXIT_FAILURE;                                                                                                                   \
+    }         
 #endif
 
 #ifdef _DEBUG
@@ -58,13 +75,15 @@ const size_t MAX_LEN_PATH = 128;
     };
 
     enum ListErrorCodes {
-        LIST_ERR_NONE                     = 0,
-        LIST_ERR_SIZE_CAPACITY_CORRUPTION = 1 << 0,
-        LIST_ERR_POISON_CORRUPTION        = 1 << 1,
-        LIST_ERR_STRAIGHT_LOOP            = 1 << 2,
-        LIST_ERR_REVERSE_LOOP             = 1 << 3,
-        LIST_ERR_FREE_LOOP                = 1 << 4,
-        LIST_ERR_LACK_OF_ELEMENTS         = 1 << 5
+        LIST_ERR_NONE                      = 0,
+        LIST_ERR_SIZE_CAPACITY_CORRUPTION  = 1 << 0,
+        LIST_ERR_POISON_CORRUPTION         = 1 << 1,
+        LIST_ERR_STRAIGHT_LOOP             = 1 << 2,
+        LIST_ERR_REVERSE_LOOP              = 1 << 3,
+        LIST_ERR_FREE_LOOP                 = 1 << 4,
+        LIST_ERR_STRAIGHT_LACK_OF_ELEMENTS = 1 << 5,
+        LIST_ERR_REVERSE_LACK_OF_ELEMENTS  = 1 << 6,
+        LIST_ERR_FREE_LACK_OF_ELEMENTS     = 1 << 7
     };
 
     enum LogModes {
@@ -73,15 +92,16 @@ const size_t MAX_LEN_PATH = 128;
         END_OF_PROGRAM    = 2
     };
 
-    enum FillColors {
+    enum CellColorsForGraphviz {
         COLOR_FREE     = 0xE6F3FF,
         COLOR_OCCUPIED = 0xB3D9FF
     };
 #endif
 
 enum ListStatus_t {
-    SUCCESS = 0,
-    FAIL    = 1
+    SUCCESS     = 0,
+    FAIL        = 1,
+    FAIL_VERIFY = 2
 };
 
 typedef double ElementData_t;
@@ -116,18 +136,14 @@ struct List_t {
 ListStatus_t ListCtor( List_t* list, const int data_capacity );
 ListStatus_t ListDtor( List_t* lsit );
 
-void ListRealloc( List_t* list, const int new_capacity );
-
 ListStatus_t ListInsertAfter ( List_t* list, const int index, const ElementData_t number  );
 ListStatus_t ListInsertBefore( List_t* list, const int index, const ElementData_t number );
 ListStatus_t ListDelete      ( List_t* list, const int index );
 
-int ListGetHead( List_t* list );
-int ListGetTail( List_t* list );
-
 int ListGetHead    ( const List_t* list );
 int ListGetTail    ( const List_t* list );
 int ListGetFree    ( const List_t* list );
+
 int ListGetSize    ( const List_t* list );
 int ListGetCapacity( const List_t* list );
 
@@ -136,20 +152,8 @@ int           ListGetPrev   ( const List_t* list, const int index );
 ElementData_t ListGetElement( const List_t* list, const int index );
 
 #ifdef _DEBUG
-    ListStatus_t ListVerify( List_t* list );
-
-    LogStat* ListGetLogging( const List_t* list );
-
     void ListLog( List_t* list, LogModes mode, const char* service_message, ... );
-
-    void FolderCreate( List_t* list );
-
-    void ListDump      ( const List_t* list, const char* service_message, va_list args );
-    void ListPrintStats( const List_t* list );
-
-    void GraphicPrintoutDraw( List_t* list );
 #endif
 
-// за size  проверять, что мы возвращаемся к нулевому элементу
 
 #endif // LIST_H

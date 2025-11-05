@@ -10,6 +10,83 @@
 #include "DebugUtils.h"
 
 
+#ifdef _DEBUG
+    static ListStatus_t ListVerify( List_t* list ) {
+        my_assert( list, "Null pointer on `list`" );
+
+        if ( list->size > list->capacity ) { list->var_info.error_code |= LIST_ERR_SIZE_CAPACITY_CORRUPTION; return  FAIL_VERIFY; }
+
+        const int size     = ListGetSize    ( list );
+        const int capacity = ListGetCapacity( list );
+
+        int idx = 0;
+        int counter = 0;
+
+        // CHECK FOR STRAIGHT LOOP
+        idx = ListGetHead( list );
+        counter = 0;
+
+        while ( idx != 0) {
+            idx = ListGetNext( list, idx );
+            counter++;
+
+            if ( counter > size ) {
+                list->var_info.error_code |= LIST_ERR_STRAIGHT_LOOP;
+
+                break;
+            }
+        }
+
+        if ( counter < size ) {
+            list->var_info.error_code |= LIST_ERR_STRAIGHT_LACK_OF_ELEMENTS;
+        }
+
+        // CHECK FOR REVERSE LOOP
+        idx = ListGetTail( list );
+        counter = 0;
+
+        while ( idx != 0 ) {
+            idx = ListGetPrev( list, idx );
+            counter++;
+
+            if ( counter > size ) {
+                list->var_info.error_code |= LIST_ERR_REVERSE_LOOP;
+
+                break;
+            }
+        }
+
+        if ( counter < size ) {
+            list->var_info.error_code |= LIST_ERR_REVERSE_LACK_OF_ELEMENTS;
+        }
+
+        // CHECK FOR LOOP OF FREE ELEMENTS
+        idx = ListGetFree( list );
+        counter = 0;
+
+        while ( idx != 0) {
+            idx = ListGetNext( list, idx );
+            counter++;
+
+            if ( counter > capacity - size ) {
+                list->var_info.error_code |= LIST_ERR_FREE_LOOP;
+
+                break;
+            }
+        }
+
+        if ( counter < capacity - size ) {
+            list->var_info.error_code |= LIST_ERR_FREE_LACK_OF_ELEMENTS;
+        }
+
+        if ( list->var_info.error_code != LIST_ERR_NONE ) {
+            return FAIL_VERIFY;
+        }
+
+        return SUCCESS;
+    }
+#endif
+
 ListStatus_t ListCtor( List_t* list, const int data_capacity ) {
     PRINT_EXECUTING;
     my_assert( list, "Null pointer on `list`" );
@@ -67,13 +144,13 @@ ListStatus_t ListDtor( List_t* list ) {
     return SUCCESS;
 }
 
-int ListGetHead( List_t* list ) {
+int ListGetHead( const List_t* list ) {
     my_assert( list, "Null pointer on `list`" );
 
     return list->elements[0].next;
 }
 
-int ListGetTail( List_t* list ) {
+int ListGetTail( const List_t* list ) {
     my_assert( list, "Null pointer on `list`" );
 
     return list->elements[0].prev;
@@ -106,6 +183,8 @@ int ListGetNext   ( const List_t* list, const int index ) {
 int ListGetPrev   ( const List_t* list, const int index ) {
     my_assert( list, "Null pointer on `list`" );
 
+    if ( index > list->capacity ) return -1;
+
     return list->elements[ index ].prev;
 }
 
@@ -115,81 +194,81 @@ ElementData_t ListGetElement( const List_t* list, const int index ) {
     return list->elements[ index ].value;
 }
 
-
-
-void ListRealloc( List_t* list, const int new_capacity ) {
-    PRINT_EXECUTING;
+static ListStatus_t ListRealloc( List_t* list, const int new_capacity ) {
     my_assert( list,             "Null pointer on `list`" );
     my_assert( new_capacity > 0, "New capacity below 0"   );
 
-    ListLog( list, DUMP, "Before <font color\"orange\">Realloc</font>" );
+    VERIFY( "Before <font color\"orange\">Realloc</font>" );
 
-    list->elements = ( Element_t* ) realloc ( list->elements, ( ( size_t ) new_capacity ) * sizeof( *list->elements ) );
+    list->capacity = new_capacity;
+
+    list->elements = ( Element_t* ) realloc ( list->elements, ( ( size_t ) new_capacity + 1 ) * sizeof( *list->elements ) );
     assert( list->elements && "Memory reallocation error" );
 
-    int idx = list->free;
-    int next_idx = list->elements[ idx ].next;
+    int idx = ListGetFree( list );
 
-    while ( next_idx != 0 ) {
-        idx = next_idx;
-        next_idx = list->elements[ idx ].next;
+    while ( ListGetNext( list, idx ) != 0 && ListGetNext( list, idx ) == -1 ) {
+        idx = ListGetNext( list, idx );
     }
 
-    while ( idx <= new_capacity ) {
-        list->elements[ idx ].value = poison;
-        list->elements[ idx ].next  = idx + 1;
-        list->elements[ idx ].prev  = -1;
+    while ( idx < new_capacity ) {
         list->elements[ idx ] = {
-            .prev = -1,
+            .prev  = -1,
             .value = poison,
-            .next = idx + 1
+            .next  = idx + 1
         };
 
         idx++;
     }
 
-    list->elements[ idx ].next = 0;
+    list->elements[ idx ] = {
+        .prev  = -1,
+        .value = poison,
+        .next  = 0
+    };
+
+    VERIFY( "Before <font color\"orange\">Realloc</font>" );
+
+    PRINT_STATUS_OK;
+    return SUCCESS;
 }
 
 ListStatus_t ListInsertAfter( List_t* list, const int index, const ElementData_t number ) {
     PRINT_EXECUTING;
     my_assert( list, "Null pointer on `list`" );
 
-    // ListLog( list, DUMP, "Before <font color=\"blue\"> INSERT AFTER</font>", number );
-    ListLog( list, DUMP, "Before <font color=\"blue\"> INSERT ( %lg ) AFTER <%d> </font>", number, index );
+    VERIFY( "Before <font color=\"blue\">INSERT ( %lg ) AFTER <%d></font>", number, index );
 
-    VERIFY(
-        int next_free_idx = list->elements[ list->free ].next;
+    int next_free_idx = list->elements[ list->free ].next;
 
-        if ( list->size == 0 && index > 0 ) {
-            PRINT_STATUS_FAIL;
-            return FAIL;
-        }
+    if ( list->size == 0 && index > 0 ) {
+        PRINT_STATUS_FAIL;
+        return FAIL;
+    }
 
-        if ( list->elements[ index ].prev == -1 ) {
-            PRINT_STATUS_FAIL;
-            return FAIL;   
-        }
+    if ( list->elements[ index ].prev == -1 ) {
+        PRINT_STATUS_FAIL;
+        return FAIL;   
+    }
 
-        if ( list->size + 1 > list->capacity ) {
-            ListRealloc( list, list->capacity * 2 );
-        }
+    if ( list->size >= list->capacity ) {
+        ListRealloc( list, list->capacity * 2 );
+    }
 
-        list->elements[ list->free ] = { 
-            .prev = index, 
-            .value = number, 
-            .next = list->elements[ index ].next 
-        };
+    list->elements[ list->free ] = { 
+        .prev = index, 
+        .value = number, 
+        .next = list->elements[ index ].next 
+    };
 
-        list->elements[ index ].next = list->free;
-        list->elements[ list->elements[ list->free ].next ].prev = list->free;
+    list->elements[ index ].next = list->free;
+    list->elements[ list->elements[ list->free ].next ].prev = list->free;
 
-        list->free = next_free_idx;
+    list->free = next_free_idx;
 
-        list->size++;
-    );
+    list->size++;
 
-    ListLog( list, DUMP, "After <font color=\"blue\"> INSERT (%lg) AFTER <%d></font>", number, index );
+    VERIFY( "After <font color=\"blue\">INSERT (%lg) AFTER <%d></font>", number, index );
 
     PRINT_STATUS_OK;
     return SUCCESS;
@@ -197,41 +276,40 @@ ListStatus_t ListInsertAfter( List_t* list, const int index, const ElementData_t
 
 ListStatus_t ListInsertBefore( List_t* list, const int index, const ElementData_t number ) {
     PRINT_EXECUTING;
-    my_assert( list,      "Null pointer on `list`" );
+    my_assert( list, "Null pointer on `list`" );
+    my_assert( isfinite( number ), "An infinite number" );
 
-    ListLog( list, DUMP, "Before <font color=\"blue\"> <font color=\"blue\"> INSERT BEFORE </font>", number, index );
+    VERIFY( "Before <font color=\"blue\"> INSERT (%lg) BEFORE <%d></font>", number, index );
 
-    VERIFY(
-        if ( list->size == 0 && index > 2 ) {
-            PRINT_STATUS_FAIL;
-            return FAIL;
-        }
+    if ( list->size == 0 && index > 2 ) {
+        PRINT_STATUS_FAIL;
+        return FAIL;
+    }
 
-        if ( list->elements[ index ].prev == -1 ) {
-            PRINT_STATUS_FAIL;
-            return FAIL;   
-        }
+    if ( list->elements[ index ].prev == -1 ) {
+        PRINT_STATUS_FAIL;
+        return FAIL;   
+    }
 
-        if ( list->size + 1 > list->capacity ) {
-            ListRealloc( list, list->capacity * 2 );
-        }
+    if ( list->size + 1 > list->capacity ) {
+        ListRealloc( list, list->capacity * 2 );
+    }
 
-        int next_free_idx = list->elements[ list->free ].next;
+    int next_free_idx = list->elements[ list->free ].next;
 
-        list->elements[ list->free ].value = number;
+    list->elements[ list->free ].value = number;
 
-        list->elements[ list->free ].prev = list->elements[ index ].prev;
-        list->elements[ list->free ].next = index;
+    list->elements[ list->free ].prev = list->elements[ index ].prev;
+    list->elements[ list->free ].next = index;
 
-        list->elements[ index ].prev = list->free;
-        list->elements[ list->elements[ list->free ].prev ].next = list->free;
+    list->elements[ index ].prev = list->free;
+    list->elements[ list->elements[ list->free ].prev ].next = list->free;
 
-        list->free = next_free_idx;
+    list->free = next_free_idx;
 
-        list->size++;
-    );
+    list->size++;
 
-    ListLog( list, DUMP, "After <font color=\"blue\"> INSERT BEFORE</font>", number, index );
+    VERIFY( "After <font color=\"blue\">INSERT (%lg) BEFORE <%d></font>", number, index );
 
     PRINT_STATUS_OK;
     return SUCCESS;
@@ -241,154 +319,37 @@ ListStatus_t ListDelete( List_t* list, const int index ) {
     PRINT_EXECUTING;
     my_assert( list, "Null pointer on `list`" );
 
-    ListLog( list, DUMP, "Before <font color=\"red\"> DELETE</font>", index );        // TODO: add func VA_ARGS for print Before\After Insert\Delete and others
+    VERIFY( "Before <font color=\"red\">DELETE <%d></font>", index );
 
-    VERIFY(
-        if ( list->size == 0 ) {
-            fprintf( stderr, "Error: delete from empty list \n" );
-            PRINT_STATUS_FAIL;
-            return FAIL;
-        }
+    if ( list->size == 0 ) {
+        fprintf( stderr, "Error: delete from empty list \n" );
+        PRINT_STATUS_FAIL;
+        return FAIL;
+    }
 
-        if ( list->elements[ index ].prev == -1 ) {
-            fprintf( stderr, "Error: delete free element \n" );
-            PRINT_STATUS_FAIL;
-            return FAIL;
-        }
+    if ( list->elements[ index ].prev == -1 ) {
+        fprintf( stderr, "Error: delete free element \n" );
+        PRINT_STATUS_FAIL;
+        return FAIL;
+    }
 
-        list->elements[ list->elements[ index ].prev ].next = list->elements[ index ].next;
-        list->elements[ list->elements[ index ].next ].prev = list->elements[ index ].prev;
+    list->elements[ list->elements[ index ].prev ].next = list->elements[ index ].next;
+    list->elements[ list->elements[ index ].next ].prev = list->elements[ index ].prev;
 
-        list->elements[ index ].value = poison;
-        list->elements[ index ].prev  = -1;
-        list->elements[ index ].next  = list->free;
-        list->elements[ index ] = {
-            .prev = -1,
-            .value = poison,
-            .next = list->free
-        };
+    list->elements[ index ].value = poison;
+    list->elements[ index ].prev  = -1;
+    list->elements[ index ].next  = list->free;
+    list->elements[ index ] = {
+        .prev = -1,
+        .value = poison,
+        .next = list->free
+    };
 
-        list->free = index;
-        list->size--;
-    );
+    list->free = index;
+    list->size--;
 
-    ListLog( list, DUMP, "After <font color=\"red\"> DELETE</font>", index );
+    VERIFY( "After <font color=\"red\">DELETE <%d></font>", index );
 
     PRINT_STATUS_OK;
     return SUCCESS;
 }
-
-#ifdef _DEBUG
-    ListStatus_t ListVerify( List_t* list ) {
-        my_assert( list, "Null pointer on `list`" );
-
-        if ( list->size > list->capacity ) { list->var_info.error_code |= LIST_ERR_SIZE_CAPACITY_CORRUPTION; return  FAIL; }
-
-        // int idx = LIST_HEAD( list );
-        // int next_idx = list->elements[ idx ].next;
-        // int cnt = 0;
-
-        // while ( idx != 0 ) {
-        //     cnt++;
-        //     idx = next_idx;
-        //     next_idx = list->elements[ idx ].next;
-
-        //     if ( cnt > list->size ) {
-        //         list->var_info.error_code |= LIST_ERR_LIST_ERR_LOOP_STRAIGHT;
-        //         break;
-        //     }
-        // }
-        // if ( cnt < list->size ) list->var_info.error_code |= LIST_ERR_LACK_OF_ELEMENTS;
-
-        int size = ListGetSize( list );
-        int capacity = 0;
-
-        int idx = 0;
-        int counter = 0;
-
-        // while ( idx != 0) {
-        //     idx = ListGetNext( list, idx );
-        //     counter++;
-
-        //     if ( counter > size ) {
-        //         list->var_info.error_code |= LIST_ERR_STRAIGHT_LOOP;
-
-        //         break;
-        //     }
-        // }
-
-        // if ( counter < list->size ) {
-        //     list->var_info.error_code |= LIST_ERR_LACK_OF_ELEMENTS;
-        // }
-
-        #define CHECK_FOR_LOOP( node1, node2, err ) \
-            idx = ListGet##node1( list );      \
-            counter = 0;                       \
-            PRINT( " \nBefore check --- %d - idx\t%d - cnt\n", idx, counter ); \
-                                               \
-            while ( idx != 0) {                \
-                PRINT( "Before idx.next --- %d - idx\t%d - cnt\n", idx, counter ); \
-                idx = ListGet##node2( list, idx ); \
-                counter++;                     \
-                PRINT( "Before idx.prev --- %d - idx\t%d - cnt\n", idx, counter ); \
-                                               \
-                if ( counter > size ) {        \
-                    list->var_info.error_code |= LIST_ERR_##err##_LOOP; \
-                    PRINT( "I'm in if about counter>size | %d - idx\t%d - cnt\t%d - size\n", idx, counter, size ); \
-                                               \
-                    break;                     \
-                }                              \
-            }                                  \
-                                               \
-            if ( counter < list->size ) {      \
-                list->var_info.error_code |= LIST_ERR_LACK_OF_ELEMENTS; \
-            }
-        
-        CHECK_FOR_LOOP( Head, Next, STRAIGHT );
-        // CHECK_FOR_LOOP( Tail, Prev, REVERSE  );
-        // CHECK_FOR_LOOP( Free, Next, FREE );
-
-
-        // idx = LIST_FREE( list );
-        // next_idx = list->elements[ idx ].next;
-
-        // while ( idx != 0 ) {
-        //     if ( !( abs( list->elements[ idx ].value - poison ) <= DBL_EPSILON && list->elements[ idx ].prev == -1 ) ) {
-        //         list->var_info.error_code |= LIST_ERR_POISON_CORRUPTION;
-
-        //         break;
-        //     }
-        //     idx = next_idx;
-        //     next_idx = list->elements[ idx ].next;
-
-        //     if ( cnt > list->capacity - list->size ) {
-        //         list->var_info.error_code |= LIST_ERR_LIST_ERR_LOOP_FREE;
-        //         break;
-        //     }
-        // }
-
-        // idx = LIST_TAIL( list );
-        // int prev_idx = list->elements[ idx ].prev;
-        // cnt = 0;
-
-        // while ( idx != 0 ) {
-        //     cnt++;
-        //     idx = prev_idx;
-        //     prev_idx = list->elements[ idx ].prev;
-
-        //     if ( cnt > list->size ) {
-        //         list->var_info.error_code |= LIST_ERR_LIST_ERR_LOOP_REVERSE;
-        //         break;
-        //     }
-        // }
-        // if ( cnt < list->size ) list->var_info.error_code |= LIST_ERR_LACK_OF_ELEMENTS;
-
-        // PRINT( "%u ", list->var_info.error_code );
-        // if ( list->var_info.error_code != LIST_ERR_NONE ) {
-        //     ListLog( list, DUMP, "<font color=\"red\">ERROR</font>" );
-        //     return FAIL;
-        // }
-
-        return SUCCESS;
-    }
-#endif
