@@ -31,15 +31,17 @@ const size_t MAX_LEN_PATH = 128;
     if ( status == FAIL ) {                                                                                                                    \
         fprintf( stderr, COLOR_BRIGHT_RED "Incorrect command `%s` \n", #command );                                                             \
         ListDtor( &list );                                                                                                                     \
+        ON_DEBUG( ListLog( &list, END_OF_PROGRAM, nullptr ); )                                                                                 \
         return EXIT_FAILURE;                                                                                                                   \
     }                                                                                                                                          \
     else if ( status != SUCCESS ) {                                                                                                            \
         fprintf(                                                                                                                               \
             stderr,                                                                                                                            \
-            COLOR_BRIGHT_RED "ERROR: Verification failed while executing `%s`. See logs for details: ./%s. \n",                                  \
+            COLOR_BRIGHT_RED "ERROR: Verification failed while executing `%s`. See logs for details: ./%s. \n",                                \
             #command, list.logging.log_file_path                                                                                               \
         );                                                                                                                                     \
         ListDtor( &list );                                                                                                                     \
+        ON_DEBUG( ListLog( &list, END_OF_PROGRAM, nullptr ); )                                                                                 \
         return EXIT_FAILURE;                                                                                                                   \
     }                                                                                                                                          \
     }
@@ -47,7 +49,7 @@ const size_t MAX_LEN_PATH = 128;
 #else
 #define VERIFY( str, ... ) 
 #define CHECK_STATUS( command )                                                                                                                \
-    if ( command == FAIL ) {                                                                                                                    \
+    if ( command == FAIL ) {                                                                                                                   \
         fprintf( stderr, COLOR_BRIGHT_RED "Incorrect command `%s` \n", #command );                                                             \
         ListDtor( &list );                                                                                                                     \
         return EXIT_FAILURE;                                                                                                                   \
@@ -135,6 +137,8 @@ struct List_t {
 
 ListStatus_t ListCtor( List_t* list, const int data_capacity );
 ListStatus_t ListDtor( List_t* lsit );
+
+ListStatus_t ListLinearizer( List_t* list, const int new_capacity );
 
 ListStatus_t ListInsertAfter ( List_t* list, const int index, const ElementData_t number  );
 ListStatus_t ListInsertBefore( List_t* list, const int index, const ElementData_t number );

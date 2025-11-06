@@ -7,6 +7,7 @@
 
 
 #include "List.h"
+#include "Colors.h"
 #include "DebugUtils.h"
 
 
@@ -26,7 +27,7 @@
         idx = ListGetHead( list );
         counter = 0;
 
-        while ( idx != 0) {
+        while ( idx > 0) {
             idx = ListGetNext( list, idx );
             counter++;
 
@@ -45,7 +46,7 @@
         idx = ListGetTail( list );
         counter = 0;
 
-        while ( idx != 0 ) {
+        while ( idx > 0 ) {
             idx = ListGetPrev( list, idx );
             counter++;
 
@@ -64,7 +65,7 @@
         idx = ListGetFree( list );
         counter = 0;
 
-        while ( idx != 0) {
+        while ( idx > 0) {
             idx = ListGetNext( list, idx );
             counter++;
 
@@ -144,6 +145,67 @@ ListStatus_t ListDtor( List_t* list ) {
     return SUCCESS;
 }
 
+ListStatus_t ListLinearizer( List_t* list, const int new_capacity ) {
+    PRINT_EXECUTING;
+    my_assert( list,             "Null pointer on `list`" );
+    my_assert( new_capacity > 0, "New capacity below 0"   );
+
+    VERIFY( "Before <font color=\"cyan\">Linearizer (%d)</font>", new_capacity );
+
+    if ( new_capacity < ListGetSize( list ) ) {
+        fprintf( stderr, COLOR_BRIGHT_RED "The new capacity is smaller than size!\n" );
+
+        PRINT_STATUS_FAIL;
+        return FAIL;
+    }
+
+    Element_t* data = ( Element_t* ) calloc ( ( size_t ) new_capacity + 1, sizeof( *data ) );
+    assert( data && "Memory allocation error" );
+
+    int old_idx = ListGetHead( list );
+    int new_idx = 1;
+
+    while ( old_idx != 0 ) {
+        data[ new_idx ] = {
+            .prev  = new_idx - 1,
+            .value = ListGetElement( list, old_idx ),
+            .next  = new_idx + 1
+        };
+
+        old_idx = ListGetNext( list, old_idx );
+        new_idx++;
+    }
+
+    data[ new_idx - 1 ].next = 0;
+
+    while ( new_idx <= new_capacity ) {
+        data[ new_idx ] = {
+            .prev = -1,
+            .value = poison,
+            .next = new_idx + 1
+        };
+
+        new_idx++;
+    }
+
+    data[ new_idx - 1 ].next = 0;
+    data[0] = {
+        .prev = ListGetSize( list ),
+        .next = ( ListGetSize( list ) > 0 ) ? 1 : 0
+    };
+
+    free( list->elements );
+    list->elements = data;
+    list->capacity = new_capacity;
+    list->free     = ListGetSize( list ) + 1;
+
+
+    VERIFY( "After <font color=\"cyan\">Linearizer (%d)</font>", new_capacity );
+
+    PRINT_STATUS_OK;
+    return SUCCESS;
+}
+
 int ListGetHead( const List_t* list ) {
     my_assert( list, "Null pointer on `list`" );
 
@@ -174,16 +236,18 @@ int ListGetFree( const List_t* list ) {
     return list->free;
 }
 
-int ListGetNext   ( const List_t* list, const int index ) {
+int ListGetNext( const List_t* list, const int index ) {
     my_assert( list, "Null pointer on `list`" );
+
+    if ( list->capacity < index ) return -1;
 
     return list->elements[ index ].next;
 }
 
-int ListGetPrev   ( const List_t* list, const int index ) {
+int ListGetPrev( const List_t* list, const int index ) {
     my_assert( list, "Null pointer on `list`" );
 
-    if ( index > list->capacity ) return -1;
+    if ( list->capacity < index ) return -1;
 
     return list->elements[ index ].prev;
 }
@@ -194,66 +258,29 @@ ElementData_t ListGetElement( const List_t* list, const int index ) {
     return list->elements[ index ].value;
 }
 
-static ListStatus_t ListRealloc( List_t* list, const int new_capacity ) {
-    my_assert( list,             "Null pointer on `list`" );
-    my_assert( new_capacity > 0, "New capacity below 0"   );
-
-    VERIFY( "Before <font color\"orange\">Realloc</font>" );
-
-    list->capacity = new_capacity;
-
-    list->elements = ( Element_t* ) realloc ( list->elements, ( ( size_t ) new_capacity + 1 ) * sizeof( *list->elements ) );
-    assert( list->elements && "Memory reallocation error" );
-
-    int idx = ListGetFree( list );
-
-    while ( ListGetNext( list, idx ) != 0 && ListGetNext( list, idx ) == -1 ) {
-        idx = ListGetNext( list, idx );
-    }
-
-    while ( idx < new_capacity ) {
-        list->elements[ idx ] = {
-            .prev  = -1,
-            .value = poison,
-            .next  = idx + 1
-        };
-
-        idx++;
-    }
-
-    list->elements[ idx ] = {
-        .prev  = -1,
-        .value = poison,
-        .next  = 0
-    };
-
-    VERIFY( "Before <font color\"orange\">Realloc</font>" );
-
-    PRINT_STATUS_OK;
-    return SUCCESS;
-}
-
 ListStatus_t ListInsertAfter( List_t* list, const int index, const ElementData_t number ) {
     PRINT_EXECUTING;
     my_assert( list, "Null pointer on `list`" );
 
     VERIFY( "Before <font color=\"blue\">INSERT ( %lg ) AFTER <%d></font>", number, index );
 
-    int next_free_idx = list->elements[ list->free ].next;
-
     if ( list->size == 0 && index > 0 ) {
+        fprintf( stderr, COLOR_BRIGHT_RED "Insert after <%d> in empty list \n", index );
         PRINT_STATUS_FAIL;
         return FAIL;
     }
 
-    if ( list->elements[ index ].prev == -1 ) {
+    if ( ListGetPrev( list, index ) == -1 ) {
+        fprintf( stderr, COLOR_BRIGHT_RED "Insert after empty element \n" );
         PRINT_STATUS_FAIL;
         return FAIL;   
     }
 
-    if ( list->size >= list->capacity ) {
-        ListRealloc( list, list->capacity * 2 );
+    if ( ListGetSize( list ) >= ListGetCapacity( list ) ) {
+        ListLinearizer( list, list->capacity * 2 );
     }
+
+    int next_free_idx = ListGetNext( list, ListGetFree( list ) );
 
     list->elements[ list->free ] = { 
         .prev = index, 
@@ -287,12 +314,13 @@ ListStatus_t ListInsertBefore( List_t* list, const int index, const ElementData_
     }
 
     if ( list->elements[ index ].prev == -1 ) {
+        fprintf( stderr, COLOR_BRIGHT_RED "Insert before empty element \n" );
         PRINT_STATUS_FAIL;
         return FAIL;   
     }
 
-    if ( list->size + 1 > list->capacity ) {
-        ListRealloc( list, list->capacity * 2 );
+    if ( list->size >= list->capacity ) {
+        ListLinearizer( list, list->capacity * 2 );
     }
 
     int next_free_idx = list->elements[ list->free ].next;
