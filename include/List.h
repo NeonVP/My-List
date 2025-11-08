@@ -156,6 +156,8 @@ int           ListGetPrev   ( const List_t* list, const int index );
 ElementData_t ListGetElement( const List_t* list, const int index );
 
 #ifdef _DEBUG
+    ListStatus_t ListVerify( List_t* list );
+    
     void ListLog( List_t* list, LogModes mode, const char* service_message, ... );
 #endif
 

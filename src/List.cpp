@@ -12,7 +12,7 @@
 
 
 #ifdef _DEBUG
-    static ListStatus_t ListVerify( List_t* list ) {
+    ListStatus_t ListVerify( List_t* list ) {
         my_assert( list, "Null pointer on `list`" );
 
         if ( list->size > list->capacity ) { list->var_info.error_code |= LIST_ERR_SIZE_CAPACITY_CORRUPTION; return  FAIL_VERIFY; }
@@ -110,14 +110,16 @@ ListStatus_t ListCtor( List_t* list, const int data_capacity ) {
 
     list->logging.image_number = 0;
 
-    ListLog( list, DUMP, "After <font color=\"orange\"> Constructor </font>" );
+    // ListLog( list, DUMP, "After <font color=\"orange\"> Constructor </font>" );
 
-    #ifdef _DEBUG
-        if ( ListVerify( list ) != SUCCESS )  {
-            PRINT_STATUS_FAIL;
-            return  FAIL;
-        }
-    #endif
+    // #ifdef _DEBUG
+    //     if ( ListVerify( list ) != SUCCESS )  {
+    //         PRINT_STATUS_FAIL;
+    //         return  FAIL;
+    //     }
+    // #endif
+
+    VERIFY( "After <font color=\"orange\"> Constructor </font>" );
 
     PRINT_STATUS_OK;
     return SUCCESS;
@@ -127,6 +129,13 @@ ListStatus_t ListDtor( List_t* list ) {
     PRINT_EXECUTING;
     my_assert( list, "Null pointer on `list`" );
 
+    if ( ListVerify( list ) != SUCCESS ) {
+        fprintf( 
+            stderr, 
+            COLOR_BRIGHT_RED "ERROR: Verification failed while executing `ListDtor`. See logs for details: ./%s. \n",
+            list->logging.log_file_path
+        );
+    }
     ListLog( list, DUMP, "Before <font color=\"orange\">Destructor</font>" );
 
     free( list->elements );

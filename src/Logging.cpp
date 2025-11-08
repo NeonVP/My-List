@@ -307,8 +307,6 @@
 
 
     void ListLog( List_t* list, const LogModes mode, const char* service_message, ... ) { 
-        my_assert( list, "Null pointer on `list`" );
-
         switch ( mode ) {   
             case BEGIN_OF_PROGRAMM: {
                 FolderCreate( list );
@@ -321,6 +319,8 @@
                 break;
             }
             case DUMP: {
+                my_assert( list, "Null pointer on `list`" );
+
                 va_list args;
                 va_start( args, service_message );
                 ListDump( list, service_message, args );
