@@ -6,8 +6,8 @@
 
 #ifdef _DEBUG
     #define my_assert(arg, message)                                                                       \
-        if ( !( arg ) ) {                                                                                     \
-            fprintf( stderr, COLOR_BRIGHT_RED "Error in function `%s` %s:%d: %s \n" COLOR_RESET,                 \
+        if ( !( arg ) ) {                                                                                 \
+            fprintf( stderr, COLOR_BRIGHT_RED "Error in function `%s` %s:%d: %s \n" COLOR_RESET,          \
                     __func__, __FILE__, __LINE__, message );                                              \
             abort();                                                                                      \
         }

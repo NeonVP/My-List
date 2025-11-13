@@ -1,5 +1,4 @@
 #include <stdlib.h>
-#include <sys/types.h>
 
 #ifdef _LINUX
 #include <linux/limits.h>
@@ -13,11 +12,10 @@ const size_t MAX_LEN_PATH = 128;
 
 #include "DebugUtils.h"
 
-
 #define INIT( name ) ON_DEBUG( .var_info={ LIST_ERR_NONE, #name, __func__, __FILE__, __LINE__ } )
 
 #ifdef _DEBUG
-#define VERIFY( ... )                                           \
+#define VERIFY( ... )                                                \
     ListVerify( list );                                              \
     ListLog( list, DUMP, __VA_ARGS__ );                              \
     if ( list->var_info.error_code != LIST_ERR_NONE ) {              \
@@ -109,30 +107,11 @@ enum ListStatus_t {
 typedef double ElementData_t;
 
 // TODO: hide struct fields from users: transfer struct fo .cpp and add typedef
-// struct list;
-// typedef list List_t;
+struct list_;
+typedef struct list_ List_t;
 
-const ElementData_t poison = 777;
-
-struct Element_t {
-    int           prev;
-    ElementData_t value;
-    int           next;
-};
-
-struct List_t {    
-    int size;
-    int capacity;
-    
-    int free;
-
-    Element_t* elements;
-
-    #ifdef _DEBUG
-        VarInfo_t var_info;
-        LogStat logging;
-    #endif
-};
+const ElementData_t LIST_POISON_VALUE  = 777;
+const int           LIST_FREE_PREV_IDX = -1;
 
 
 ListStatus_t ListCtor( List_t* list, const int data_capacity );
@@ -151,13 +130,17 @@ int ListGetFree    ( const List_t* list );
 int ListGetSize    ( const List_t* list );
 int ListGetCapacity( const List_t* list );
 
+#ifdef _DEBUG
+    
+#endif
+
 int           ListGetNext   ( const List_t* list, const int index );
 int           ListGetPrev   ( const List_t* list, const int index );
 ElementData_t ListGetElement( const List_t* list, const int index );
 
 #ifdef _DEBUG
     ListStatus_t ListVerify( List_t* list );
-    
+
     void ListLog( List_t* list, LogModes mode, const char* service_message, ... );
 #endif
 
